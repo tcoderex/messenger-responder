@@ -14,11 +14,22 @@ function login(credentials: {
   password: string;
 }): Promise<any> {
   return new Promise((resolve, reject) => {
-    const loginFn = require("@dongdev/fca-unofficial");
-    loginFn(credentials, (err: unknown, api: any) => {
-      if (err) reject(err);
-      else resolve(api);
-    });
+    // FIX: Vercel serverless functions have a read-only filesystem except for
+    // /tmp. The @dongdev/fca-unofficial library calls
+    //   path.join(process.cwd(), "Fca_Database")
+    // at require-time and tries to mkdir there. We temporarily override
+    // process.cwd to /tmp so that write succeeds.
+    const originalCwd = process.cwd;
+    process.cwd = () => "/tmp";
+    try {
+      const loginFn = require("@dongdev/fca-unofficial");
+      loginFn(credentials, (err: unknown, api: any) => {
+        if (err) reject(err);
+        else resolve(api);
+      });
+    } finally {
+      process.cwd = originalCwd;
+    }
   });
 }
 
