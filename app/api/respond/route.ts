@@ -14,6 +14,62 @@ function login(credentials: {
   password: string;
 }): Promise<any> {
   return new Promise((resolve, reject) => {
+    // -------------------------------------------------------------------------
+    // MOCK: Prevent `@dongdev/fca-unofficial` from loading `sqlite3` or
+    // initializing a real Sequelize sqlite database on serverless Vercel.
+    // -------------------------------------------------------------------------
+    try {
+      const path = require("path");
+      const { createRequire } = require("module");
+      const req = typeof require !== "undefined" ? require : createRequire(process.cwd());
+
+      const fcaPath = req.resolve("@dongdev/fca-unofficial");
+      const modelsDir = path.join(path.dirname(fcaPath), "lib", "database", "models");
+      const modelsIndex = path.join(modelsDir, "index.js");
+
+      const mockModels = {
+        sequelize: {
+          authenticate: async () => {},
+          define: () => ({
+            findOne: async () => null,
+            create: async () => ({ get: () => ({}) }),
+            update: async () => ({ get: () => ({}) }),
+            destroy: async () => 0,
+            findAll: async () => [],
+          }),
+          Transaction: {
+            ISOLATION_LEVELS: {
+              READ_COMMITTED: "READ_COMMITTED"
+            }
+          }
+        },
+        syncAll: async () => {},
+        Thread: {
+          findOne: async () => null,
+          create: async () => ({ get: () => ({}) }),
+          update: async () => ({ get: () => ({}) }),
+          destroy: async () => 0,
+          findAll: async () => [],
+        }
+      };
+
+      req.cache[modelsDir] = {
+        id: modelsDir,
+        filename: modelsDir,
+        loaded: true,
+        exports: mockModels
+      } as any;
+
+      req.cache[modelsIndex] = {
+        id: modelsIndex,
+        filename: modelsIndex,
+        loaded: true,
+        exports: mockModels
+      } as any;
+    } catch (e) {
+      console.error("Failed to inject require cache mock for fca-unofficial models:", e);
+    }
+
     // FIX: Vercel serverless functions have a read-only filesystem except for
     // /tmp. The @dongdev/fca-unofficial library calls
     //   path.join(process.cwd(), "Fca_Database")
@@ -92,14 +148,15 @@ function extractLatestMessage(
 // ---------------------------------------------------------------------------
 
 export async function GET() {
+  const appStateStr = process.env.FB_APP_STATE;
   const email = process.env.FB_EMAIL;
   const password = process.env.FB_PASSWORD;
 
-  if (!email || !password) {
+  if (!appStateStr && (!email || !password)) {
     return NextResponse.json(
       {
         error:
-          "Missing credentials. Set FB_EMAIL and FB_PASSWORD in environment variables.",
+          "Missing credentials. Set FB_APP_STATE or (FB_EMAIL and FB_PASSWORD) in environment variables.",
       },
       { status: 500 },
     );
@@ -107,7 +164,22 @@ export async function GET() {
 
   try {
     // 1. Login
-    const api = await login({ email, password });
+    let credentials: any;
+    if (appStateStr) {
+      try {
+        credentials = { appState: JSON.parse(appStateStr) };
+      } catch (parseErr) {
+        return NextResponse.json(
+          {
+            error: "Failed to parse FB_APP_STATE environment variable as JSON.",
+          },
+          { status: 500 },
+        );
+      }
+    } else {
+      credentials = { email, password };
+    }
+    const api = await login(credentials);
 
     // 2. Determine current user's ID
     const myUserId = await getCurrentUserId(api);
