@@ -167,7 +167,14 @@ export async function GET() {
     let credentials: any;
     if (appStateStr) {
       try {
-        credentials = { appState: JSON.parse(appStateStr) };
+        let cleanState = appStateStr.trim();
+        if (
+          (cleanState.startsWith("'") && cleanState.endsWith("'")) ||
+          (cleanState.startsWith('"') && cleanState.endsWith('"'))
+        ) {
+          cleanState = cleanState.slice(1, -1);
+        }
+        credentials = { appState: JSON.parse(cleanState) };
       } catch (parseErr) {
         return NextResponse.json(
           {
