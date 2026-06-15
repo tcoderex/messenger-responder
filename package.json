@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@dongdev/fca-unofficial": "^1.0.0",
+    "form-data": "4.0.5",
     "next": "^16.2.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
