@@ -1,0 +1,92 @@
+================================================================================
+  WHAT TO DO NOW - Messenger Auto-Responder
+================================================================================
+
+This file is your personal checklist. Follow it step by step.
+
+================================================================================
+STEP 1 - REDEPLOY YOUR APP ON VERCE
+================================================================================
+
+Your fix has been pushed to GitHub. Vercel should auto-deploy. To check:
+
+  1. Go to https://vercel.com
+  2. Find your "messenger-responder" project
+  3. Go to "Deployments" tab
+  4. You should see a new deployment running with the latest commit
+     (message: "Fix: redirect Fca_Database writes to /tmp...")
+  5. Wait for it to finish (green checkmark = success)
+  6. If Vercel didn't auto-deploy, go to the project Dashboard and click
+     "Redeploy" on the latest deployment
+
+================================================================================
+STEP 2 - TEST THE ENDPOINT
+================================================================================
+
+Open your browser and go to:
+
+  https://messenger-responder.vercel.app/api/respond
+
+Expected result:
+  {
+    "ok": true,
+    "evaluatedThreads": 15,
+    "autoRepliesSent": 0,
+    "replies": []
+  }
+
+If you get an error, copy the error message and show it to me so I can fix it.
+
+================================================================================
+STEP 3 - SET UP CRON-JOB (FREE)
+================================================================================
+
+Your endpoint only runs when someone visits the URL. To check for new
+messages automatically, you need a free cron service:
+
+  a) Go to https://cron-job.org
+  b) Sign up for a free account
+  c) Create a new cron job:
+     - URL: https://messenger-responder.vercel.app/api/respond
+     - Interval: Every 5 minutes
+     - Save it
+
+This will call your endpoint every 5 minutes, checking for new "hi" messages
+and auto-replying "hello".
+
+================================================================================
+STEP 4 - IMPORTANT: ENVIRONMENT VARIABLES ON VERCE
+================================================================================
+
+Make sure Vercel has these environment variables set (do this before Step 2):
+
+  Log into https://vercel.com
+  → Your Project
+  → Settings
+  → Environment Variables
+  → Add the following:
+
+    FB_EMAIL             tcoderex@gmail.com
+    FB_PASSWORD          <YOUR_FB_PASSWORD>
+    OPENROUTER_API_KEY   <YOUR_OPENROUTER_API_KEY>
+
+  Make sure they are set for "Production" environment.
+  Then go to Deployments and Redeploy to apply the env vars.
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+  1. Cold starts: Every ~5-15 minutes of inactivity, Vercel clears the
+     /tmp folder. Your app will need to log into Facebook again. This
+     might trigger Facebook security checks. If you get banned, you'll
+     need to run this on a VPS (like Railway, Render, or DigitalOcean).
+
+  2. Your .env.local file on your computer is safe - it was never
+     committed to GitHub thanks to .gitignore.
+
+  3. If the endpoint fails with a Facebook login error, it means Meta
+     detected the automated login. This is a known risk with unofficial
+     Facebook automation.
+
+================================================================================
