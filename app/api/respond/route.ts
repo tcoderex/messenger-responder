@@ -1,0 +1,142 @@
+// ---------------------------------------------------------------------------
+// Vercel serverless function config – allow up to 60 s for browser emulation
+// ---------------------------------------------------------------------------
+export const maxDuration = 60;
+
+import { NextResponse } from "next/server";
+
+// ---------------------------------------------------------------------------
+// Lightweight promisify helpers for the callback-based fca-unofficial API
+// ---------------------------------------------------------------------------
+
+function login(credentials: {
+  email: string;
+  password: string;
+}): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const loginFn = require("@dongdev/fca-unofficial");
+    loginFn(credentials, (err: unknown, api: any) => {
+      if (err) reject(err);
+      else resolve(api);
+    });
+  });
+}
+
+function getCurrentUserId(api: any): Promise<string> {
+  // api.getCurrentUserID is the canonical method; fall back to api.uid if it
+  // doesn't exist (some forks expose it as a property instead).
+  if (typeof api.getCurrentUserID === "function") {
+    return new Promise((resolve, reject) => {
+      api.getCurrentUserID((err: unknown, id: string) => {
+        if (err) reject(err);
+        else resolve(String(id));
+      });
+    });
+  }
+  return Promise.resolve(String(api.uid ?? "0"));
+}
+
+function getThreadList(api: any, limit: number): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    api.getThreadList(limit, null, ["INBOX"], (err: unknown, list: any[]) => {
+      if (err) reject(err);
+      else resolve(list ?? []);
+    });
+  });
+}
+
+function sendMessage(
+  api: any,
+  message: string,
+  threadID: string,
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    api.sendMessage(message, threadID, (err: unknown, info: any) => {
+      if (err) reject(err);
+      else resolve(info);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helper – extract the latest message body and sender ID from a thread object
+// ---------------------------------------------------------------------------
+
+function extractLatestMessage(
+  thread: any,
+): { body: string; senderID: string | null } {
+  // Common shapes across fca-unofficial forks:
+  //   1. thread.lastMessage.body / .senderID
+  //   2. thread.snippet (plain text of latest message)
+  const lm = thread.lastMessage ?? {};
+  const body: string =
+    lm.body ?? thread.snippet ?? thread.snippetText ?? "";
+  const senderID: string | null =
+    lm.senderID ?? lm.senderId ?? null;
+  return { body: String(body), senderID };
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/respond
+// ---------------------------------------------------------------------------
+
+export async function GET() {
+  const email = process.env.FB_EMAIL;
+  const password = process.env.FB_PASSWORD;
+
+  if (!email || !password) {
+    return NextResponse.json(
+      {
+        error:
+          "Missing credentials. Set FB_EMAIL and FB_PASSWORD in environment variables.",
+      },
+      { status: 500 },
+    );
+  }
+
+  try {
+    // 1. Login
+    const api = await login({ email, password });
+
+    // 2. Determine current user's ID
+    const myUserId = await getCurrentUserId(api);
+
+    // 3. Fetch recent inbox threads
+    const threads = await getThreadList(api, 15);
+
+    let evaluatedCount = 0;
+    const replies: Array<{ threadID: string; threadName: string }> = [];
+
+    for (const thread of threads) {
+      const { body, senderID } = extractLatestMessage(thread);
+      evaluatedCount++;
+
+      // Only act if:
+      //   - a sender is present (not a system message)
+      //   - the sender is NOT the logged-in user
+      //   - the message body (trimmed, lowercased) equals "hi"
+      if (
+        senderID &&
+        String(senderID) !== String(myUserId) &&
+        body.trim().toLowerCase() === "hi"
+      ) {
+        await sendMessage(api, "hello", thread.threadID);
+        replies.push({
+          threadID: thread.threadID,
+          threadName: thread.name || thread.threadID,
+        });
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      evaluatedThreads: evaluatedCount,
+      autoRepliesSent: replies.length,
+      replies,
+    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error during execution";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}

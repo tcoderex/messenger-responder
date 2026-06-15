@@ -1,0 +1,115 @@
+================================================================================
+  MESSENGER AUTO-RESPONDER — VERCE DEPLOYMENT GUIDE
+================================================================================
+
+This guide walks you through deploying the Messenger auto-responder
+(Next.js API route using @dongdev/fca-unofficial) to Vercel.
+
+
+--------------------------------------------------------------------------------
+STEP 1: Initialize Git locally
+--------------------------------------------------------------------------------
+
+Open a terminal in your project folder and run:
+
+    git init
+    git add .
+    git commit -m "Initial commit - Messenger auto-responder"
+
+The .gitignore file prevents .env.local, node_modules, and .next
+from being committed.
+
+
+--------------------------------------------------------------------------------
+STEP 2: Create a GitHub repository and push
+--------------------------------------------------------------------------------
+
+On GitHub.com:
+  1. Log in to https://github.com
+  2. Click the + icon (top-right) → New repository
+  3. Name it (e.g. "messenger-responder")
+  4. Keep it Public or Private — either works with Vercel
+  5. Don't check "Add a README" or any other files
+  6. Click Create repository
+
+Back in your terminal, run the commands GitHub shows under
+"…or push an existing repository from the command line":
+
+    git remote add origin https://github.com/YOUR_USERNAME/messenger-responder.git
+    git branch -M main
+    git push -u origin main
+
+Replace YOUR_USERNAME with your actual GitHub username.
+
+
+--------------------------------------------------------------------------------
+STEP 3: Import into Vercel
+--------------------------------------------------------------------------------
+
+  1. Go to https://vercel.com and log in (sign up with GitHub if needed)
+  2. Click Add New… → Project
+  3. Find and select "messenger-responder" from the GitHub repos list
+  4. Vercel auto-detects it's a Next.js project — no build settings to change
+
+
+--------------------------------------------------------------------------------
+STEP 4: Set Environment Variables on Vercel
+--------------------------------------------------------------------------------
+
+In the Vercel project configuration screen, expand "Environment Variables"
+and add these three:
+
+    Name              Value
+    ────────────────  ─────────────────────────────────────────────────────────
+    FB_EMAIL          <your-facebook-email>
+    FB_PASSWORD       <your-facebook-password>
+    OPENROUTER_API_KEY  <your-openrouter-api-key>
+
+Set them for Production (and Preview if desired).
+
+
+--------------------------------------------------------------------------------
+STEP 5: Deploy
+--------------------------------------------------------------------------------
+
+Click Deploy. Vercel will:
+  - Install dependencies
+  - Run next build (verified to pass)
+  - Deploy to a URL like https://messenger-responder.vercel.app
+
+
+--------------------------------------------------------------------------------
+STEP 6: Test the endpoint
+--------------------------------------------------------------------------------
+
+Open your browser and visit:
+
+    https://messenger-responder.vercel.app/api/respond
+
+Expected JSON response:
+
+    {
+      "ok": true,
+      "evaluatedThreads": 15,
+      "autoRepliesSent": 0,
+      "replies": []
+    }
+
+If any thread has a "hi" message from someone else, the endpoint will
+auto-reply "hello" and that thread appears in the "replies" array.
+
+
+--------------------------------------------------------------------------------
+STEP 7: Set up a cron job to call the endpoint periodically
+--------------------------------------------------------------------------------
+
+Since the endpoint doesn't run a 24/7 listener, you need something to
+call it regularly (e.g. every 5-10 minutes). Free options:
+
+  • cron-job.org        — Free cron service, point it to your /api/respond URL
+  • GitHub Actions      — Free, can trigger via a scheduled workflow
+  • Vercel Cron Jobs    — Available on Pro plan
+
+================================================================================
+  END OF GUIDE
+================================================================================
